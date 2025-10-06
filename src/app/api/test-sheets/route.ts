@@ -9,8 +9,9 @@ export async function GET() {
   try {
     const rows = await readTestRows(3);
     return NextResponse.json({ ok: true, rows });
-  } catch (err: any) {
+    } catch (err: unknown) {
     console.error(err);
-    return NextResponse.json({ ok: false, error: err.message }, { status: 500 });
+    const message = err instanceof Error ? err.message : "Unknown error";
+    return NextResponse.json({ ok: false, error: message }, { status: 500 });
   }
 }
