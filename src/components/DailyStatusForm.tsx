@@ -15,6 +15,8 @@ export default function DailyStatusForm() {
   const [location, setLocation] = useState<Location | "">("");
   const [selectedProjects, setSelectedProjects] = useState<string[]>([]);
   const [response, setResponse] = useState<string>("");
+  const [status, setStatus] = useState<"idle" | "submitting" | "success" | "error">("idle");
+
 
   const projects = [
     "SyncME (Android)",
@@ -48,12 +50,44 @@ export default function DailyStatusForm() {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    setResponse(
-      `✅ Submitted!\nEmail: ${email}\nActivity: ${activity}\nLocation: ${location}\nProjects: ${selectedProjects.join(
-        ", "
-      )}`
-    );
+    setResponse("");
+    setStatus("submitting");
+  
+    try {
+      const res = await fetch("/api/submit", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          email,
+          activity,
+          location,
+          projects: selectedProjects,
+        }),
+      });
+  
+      const json = await res.json();
+  
+      if (json.ok) {
+        setResponse("✅ Your status has been submitted successfully!");
+        // reset form
+        setActivity("");
+        setLocation("");
+        setSelectedProjects([]);
+  
+        setStatus("success");
+        // Volvé a 'idle' después de una pequeña pausa visual
+        setTimeout(() => setStatus("idle"), 1200);
+      } else {
+        throw new Error(json.error || "Something went wrong");
+      }
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Unexpected error";
+      setResponse("❌ " + msg);
+      setStatus("error");
+    }
   }
+  
+  
 
   // Static date fields
   const date = new Date();
@@ -96,7 +130,7 @@ export default function DailyStatusForm() {
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             required
-            placeholder="name@company.com"
+            placeholder="name@sync.me"
             className="w-full border border-gray-300 focus:border-blue-400 focus:ring focus:ring-blue-100 rounded-lg px-4 py-2 transition-all"
           />
         </div>
@@ -185,7 +219,7 @@ export default function DailyStatusForm() {
                 <label className="block text-sm font-semibold text-gray-700 mb-1">
                   Projects for Today (max 3)
                 </label>
-                <div className="grid grid-cols-2 gap-2 max-h-60 overflow-y-auto p-2 border rounded-lg">
+                <div className="grid grid-cols-2 gap-2 border-gray-200 max-h-60 overflow-y-auto p-2 border rounded-lg">
                   {projects.map((p) => (
                     <label
                       key={p}
@@ -212,13 +246,43 @@ export default function DailyStatusForm() {
 
         {/* Submit */}
         <motion.button
-          whileHover={{ scale: 1.03 }}
-          whileTap={{ scale: 0.98 }}
+          whileHover={status === "idle" ? { scale: 1.03 } : {}}
+          whileTap={status === "idle" ? { scale: 0.98 } : {}}
           type="submit"
-          className="w-full bg-gradient-to-r from-blue-500 to-sky-500 text-white font-semibold rounded-lg py-3 shadow-md hover:shadow-lg transition-all cursor-pointer"
+          disabled={status !== "idle"}
+          className={`w-full flex justify-center items-center gap-2 bg-gradient-to-r from-blue-500 to-sky-500 text-white font-semibold rounded-lg py-3 shadow-md transition-all cursor-pointer ${
+            status !== "idle" ? "opacity-80 cursor-not-allowed" : "hover:shadow-lg"
+          }`}
         >
-          Submit
+          {status === "submitting" ? (
+            // Spinner minimalista
+            <motion.div
+              className="h-5 w-5 border-2 border-white border-t-transparent rounded-full"
+              animate={{ rotate: 360 }}
+              transition={{ repeat: Infinity, duration: 0.9, ease: "linear" }}
+            />
+          ) : status === "success" ? (
+            // Check de éxito
+            <span className="flex items-center gap-2">
+              <svg
+                className="h-5 w-5"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="3"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <path d="M20 6L9 17l-5-5" />
+              </svg>
+              Submitted
+            </span>
+          ) : (
+            "Submit"
+          )}
         </motion.button>
+ 
+
 
         <p className="text-xs text-gray-500 text-center">
           A copy of your responses will be emailed to the address you provided.

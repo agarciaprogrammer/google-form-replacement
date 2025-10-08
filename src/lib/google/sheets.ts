@@ -7,7 +7,7 @@ function getAuth() {
   return new google.auth.JWT({
     email: env.GOOGLE_CLIENT_EMAIL,
     key: env.GOOGLE_PRIVATE_KEY,
-    scopes: ["https://www.googleapis.com/auth/spreadsheets.readonly"],
+    scopes: ["https://www.googleapis.com/auth/spreadsheets"],
   });
 }
 
@@ -26,4 +26,19 @@ export async function readTestRows(limit = 5) {
     range,
   });
   return res.data.values ?? [];
+}
+
+// ✅ NUEVA FUNCIÓN — escritura en el sheet
+export async function appendRow(values: (string | number | null)[]) {
+  const sheets = getSheetsClient();
+  const range = `${env.SHEETS_TAB_NAME}!A:Z`; // agrega al final
+  await sheets.spreadsheets.values.append({
+    spreadsheetId: env.SHEETS_SPREADSHEET_ID,
+    range,
+    valueInputOption: "USER_ENTERED",
+    insertDataOption: "INSERT_ROWS",
+    requestBody: {
+      values: [values],
+    },
+  });
 }
