@@ -1,13 +1,32 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import Image from "next/image";
 import logo from "@/img/logo.png";
 
-
 type Activity = "Working Day" | "Vacation" | "Sick Leave";
 type Location = "Caesarea" | "Kyiv Office" | "Ramat-Gan" | "Home";
+
+// === Helpers ===
+const MONTHS = [
+  { value: "01", label: "Jan" },
+  { value: "02", label: "Feb" },
+  { value: "03", label: "Mar" },
+  { value: "04", label: "Apr" },
+  { value: "05", label: "May" },
+  { value: "06", label: "Jun" },
+  { value: "07", label: "Jul" },
+  { value: "08", label: "Aug" },
+  { value: "09", label: "Sep" },
+  { value: "10", label: "Oct" },
+  { value: "11", label: "Nov" },
+  { value: "12", label: "Dec" },
+];
+
+const YEAR_FIXED = 2025;
+const daysInMonth = (yyyy: number, mm: string) =>
+  new Date(yyyy, parseInt(mm, 10), 0).getDate(); // días del mes (1..N)
 
 export default function DailyStatusForm() {
   const [email, setEmail] = useState("");
@@ -17,6 +36,17 @@ export default function DailyStatusForm() {
   const [response, setResponse] = useState<string>("");
   const [status, setStatus] = useState<"idle" | "submitting" | "success" | "error">("idle");
 
+  // === Fecha ===
+  const today = new Date();
+  const defaultMM = String(today.getMonth() + 1).padStart(2, "0");
+  const defaultDD = String(today.getDate()).padStart(2, "0");
+  const [monthSel, setMonthSel] = useState<string>(defaultMM);
+  const [daySel, setDaySel] = useState<string>(defaultDD);
+  const maxDay = daysInMonth(YEAR_FIXED, monthSel);
+
+  useEffect(() => {
+    if (parseInt(daySel || "0", 10) > maxDay) setDaySel("");
+  }, [monthSel, maxDay]);
 
   const projects = [
     "SyncME (Android)",
@@ -52,7 +82,17 @@ export default function DailyStatusForm() {
     e.preventDefault();
     setResponse("");
     setStatus("submitting");
-  
+
+    if (!monthSel || !daySel) {
+      setResponse("❌ Please select a valid Month and Day.");
+      setStatus("error");
+      return;
+    }
+
+    const mm = monthSel;
+    const dd = String(parseInt(daySel, 10)).padStart(2, "0");
+    const selectedDate = `${YEAR_FIXED}-${mm}-${dd}`; // YYYY-MM-DD
+
     try {
       const res = await fetch("/api/submit", {
         method: "POST",
@@ -62,20 +102,21 @@ export default function DailyStatusForm() {
           activity,
           location,
           projects: selectedProjects,
+          date: selectedDate,
         }),
       });
-  
+
       const json = await res.json();
-  
+
       if (json.ok) {
         setResponse("✅ Your status has been submitted successfully!");
-        // reset form
         setActivity("");
         setLocation("");
         setSelectedProjects([]);
-  
+        setMonthSel(defaultMM);
+        setDaySel(defaultDD);
+        setEmail("");
         setStatus("success");
-        // Volvé a 'idle' después de una pequeña pausa visual
         setTimeout(() => setStatus("idle"), 1200);
       } else {
         throw new Error(json.error || "Something went wrong");
@@ -86,14 +127,6 @@ export default function DailyStatusForm() {
       setStatus("error");
     }
   }
-  
-  
-
-  // Static date fields
-  const date = new Date();
-  const month = date.toLocaleString("en-US", { month: "short" });
-  const day = date.getDate();
-  const year = 2025;
 
   return (
     <motion.div
@@ -101,25 +134,16 @@ export default function DailyStatusForm() {
       animate={{ opacity: 1, y: 0 }}
       className="max-w-xl mx-auto p-8 bg-white rounded-3xl shadow-lg border border-blue-100"
     >
-    {/* Logo */}
-    <div className="flex justify-center mb-6">
-    <Image
-        src={logo}
-        alt="Company Logo"
-        width={400}
-        height={400}
-        priority
-        />
-    </div>
+      {/* Logo */}
+      <div className="flex justify-center mb-6">
+        <Image src={logo} alt="Company Logo" width={400} height={400} priority />
+      </div>
 
       <h1 className="text-3xl font-bold text-center mb-6 text-sky-500 tracking-tight">
         Daily Status
       </h1>
 
-      <form
-        onSubmit={handleSubmit}
-        className="space-y-5 text-gray-800"
-      >
+      <form onSubmit={handleSubmit} className="space-y-5 text-gray-800">
         {/* Email */}
         <div>
           <label className="block text-sm font-semibold text-gray-700 mb-1">
@@ -135,31 +159,61 @@ export default function DailyStatusForm() {
           />
         </div>
 
-        {/* Date info */}
+        {/* Date (Month/Day separated) */}
         <div className="grid grid-cols-3 gap-3">
-          {[
-            { label: "Month", value: month },
-            { label: "Day", value: day },
-            { label: "Year", value: year },
-          ].map((f) => (
-            <div key={f.label}>
-              <label className="block text-sm font-semibold text-gray-700 mb-1">
-                {f.label}
-              </label>
-              <input
-                readOnly
-                value={f.value}
-                className="w-full border border-gray-200 bg-gray-100 rounded-lg px-4 py-2 text-gray-700"
-              />
-            </div>
-          ))}
+          {/* Month */}
+          <div>
+            <label className="block text-sm font-semibold text-gray-700 mb-1">Month</label>
+            <select
+              value={monthSel}
+              onChange={(e) => setMonthSel(e.target.value)}
+              required
+              className="w-full border border-gray-300 focus:border-blue-400 focus:ring focus:ring-blue-100 rounded-lg px-4 py-2 transition-all"
+            >
+              <option value="">Select...</option>
+              {MONTHS.map((m) => (
+                <option key={m.value} value={m.value}>
+                  {m.label}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* Day */}
+          <div>
+            <label className="block text-sm font-semibold text-gray-700 mb-1">Day</label>
+            <select
+              value={daySel}
+              onChange={(e) => setDaySel(e.target.value)}
+              required
+              className="w-full border border-gray-300 focus:border-blue-400 focus:ring focus:ring-blue-100 rounded-lg px-4 py-2 transition-all"
+            >
+              <option value="">Select...</option>
+              {Array.from({ length: maxDay }, (_, i) => {
+                const d = String(i + 1);
+                return (
+                  <option key={d} value={d}>
+                    {d}
+                  </option>
+                );
+              })}
+            </select>
+          </div>
+
+          {/* Year fijo */}
+          <div>
+            <label className="block text-sm font-semibold text-gray-700 mb-1">Year</label>
+            <input
+              readOnly
+              value={YEAR_FIXED}
+              className="w-full border border-gray-200 bg-gray-100 rounded-lg px-4 py-1.5 text-gray-700 text-center"
+            />
+          </div>
         </div>
 
         {/* Activity */}
         <div>
-          <label className="block text-sm font-semibold text-gray-700 mb-1">
-            Activity
-          </label>
+          <label className="block text-sm font-semibold text-gray-700 mb-1">Activity</label>
           <select
             value={activity}
             onChange={(e) => setActivity(e.target.value as Activity)}
@@ -186,9 +240,7 @@ export default function DailyStatusForm() {
             >
               {/* Location */}
               <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-1">
-                  Location
-                </label>
+                <label className="block text-sm font-semibold text-gray-700 mb-1">Location</label>
                 <div className="grid grid-cols-2 gap-2">
                   {["Caesarea", "Kyiv Office", "Ramat-Gan", "Home"].map((loc) => (
                     <label
@@ -255,14 +307,12 @@ export default function DailyStatusForm() {
           }`}
         >
           {status === "submitting" ? (
-            // Spinner minimalista
             <motion.div
               className="h-5 w-5 border-2 border-white border-t-transparent rounded-full"
               animate={{ rotate: 360 }}
               transition={{ repeat: Infinity, duration: 0.9, ease: "linear" }}
             />
           ) : status === "success" ? (
-            // Check de éxito
             <span className="flex items-center gap-2">
               <svg
                 className="h-5 w-5"
@@ -281,8 +331,6 @@ export default function DailyStatusForm() {
             "Submit"
           )}
         </motion.button>
- 
-
 
         <p className="text-xs text-gray-500 text-center">
           A copy of your responses will be emailed to the address you provided.

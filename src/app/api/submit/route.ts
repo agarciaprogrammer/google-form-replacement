@@ -10,6 +10,7 @@ const formSchema = z.object({
   activity: z.enum(["Working Day", "Vacation", "Sick Leave"]),
   location: z.string().optional(),
   projects: z.array(z.string()).optional(),
+  date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/), // YYYY-MM-DD
 });
 
 export async function POST(req: NextRequest) {
@@ -17,38 +18,34 @@ export async function POST(req: NextRequest) {
     const data = await req.json();
     const parsed = formSchema.parse(data);
 
-    // Fecha actual y derivados
-    const TZ = "Asia/Jerusalem";
+    const TZ = "Europe/Kyiv";
     const now = new Date();
-
-    const dd = new Intl.DateTimeFormat("en-GB", { day: "2-digit", timeZone: TZ }).format(now);
-    const mon = new Intl.DateTimeFormat("en-GB", { month: "short", timeZone: TZ }).format(now);
-    const yyyyTz = new Intl.DateTimeFormat("en-GB", { year: "numeric", timeZone: TZ }).format(now);
+    const ddNow = new Intl.DateTimeFormat("en-GB", { day: "2-digit", timeZone: TZ }).format(now);
+    const monNow = new Intl.DateTimeFormat("en-GB", { month: "short", timeZone: TZ }).format(now);
+    const yyyyNow = new Intl.DateTimeFormat("en-GB", { year: "numeric", timeZone: TZ }).format(now);
     const hhmm = new Intl.DateTimeFormat("en-GB", {
-    hour: "2-digit",
-    minute: "2-digit",
-    hour12: false,
-    timeZone: TZ,
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: false,
+      timeZone: TZ,
     }).format(now);
+    const timestamp = `${ddNow} ${monNow} ${yyyyNow} (${hhmm})`;
 
-    // 👉 Timestamp EXACTO: 01 Sep 2025 (17:13)
-    const timestamp = `${dd} ${mon} ${yyyyTz} (${hhmm})`;
+    // Procesar fecha enviada
+    const [yyyyStr, mmStr, ddStr] = parsed.date.split("-");
+    const day = parseInt(ddStr, 10);
+    const month = new Date(`${parsed.date}T00:00:00Z`).toLocaleString("en-US", { month: "short" });
+    const year = 2025;
 
-    // Month/Day/Year para columnas separadas (Day sin cero a la izquierda)
-    const month = mon;
-    const day = parseInt(dd, 10);
-    const year = 2025; // fijo como pediste
+    const ddPadded = ddStr.padStart(2, "0");
+    const dateNumeric = `${ddPadded} ${month} ${year} (00:00)`;
 
-    // "Date" estilo ejemplo: 01 Sep 2025 (00:00)
-    const dateNumeric = `${dd} ${mon} ${year} (00:00)`;
-
-    // Defaults según tipo de actividad
     let location = parsed.location ?? "";
     let projectsJoined = (parsed.projects || []).join(", ");
 
     if (parsed.activity === "Vacation") {
-      location = "Home";           // 🏠 siempre Home
-      projectsJoined = "Vacation"; // 📅 override
+      location = "Home";
+      projectsJoined = "Vacation";
     } else if (parsed.activity === "Sick Leave") {
       location = "Home";
       projectsJoined = "Sick";
