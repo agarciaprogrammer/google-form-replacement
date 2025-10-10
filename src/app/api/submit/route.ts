@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { appendRow } from "@/lib/google/sheets";
+import { Resend } from "resend";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -65,6 +66,26 @@ export async function POST(req: NextRequest) {
 
     await appendRow(row);
 
+    const resend = new Resend(process.env.RESEND_API_KEY);
+
+    const sendResult = await resend.emails.send({
+      from: "SyncME Daily <onboarding@resend.dev>",
+      to: parsed.email,
+      subject: "Daily Status Confirmation",
+      html: `
+        <h2>Hi ${parsed.email.split("@")[0]}, your daily status has been received ✅</h2>
+        <p><strong>Activity:</strong> ${parsed.activity}</p>
+        <p><strong>Location:</strong> ${location || "N/A"}</p>
+        <p><strong>Projects:</strong> ${projectsJoined || "N/A"}</p>
+        <p><strong>Date:</strong> ${dateNumeric}</p>
+        <hr/>
+        <p>Submitted at: ${timestamp}</p>
+        <p style="font-size:12px;color:#888;">This is an automatic confirmation email from SyncME Daily Status Form.</p>
+      `,
+    });
+    
+    console.log("📧 Resend result:", sendResult);
+    
     return NextResponse.json({ ok: true });
   } catch (err) {
     console.error("Submit error:", err);
