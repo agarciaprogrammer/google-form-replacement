@@ -332,9 +332,11 @@ export default function DailyStatusForm() {
           )}
         </motion.button>
 
+        {/* 
         <p className="text-xs text-gray-500 text-center">
           A copy of your responses will be emailed to the address you provided.
         </p>
+        */}
       </form>
 
       <AnimatePresence>
