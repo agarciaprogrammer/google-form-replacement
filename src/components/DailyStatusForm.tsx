@@ -39,14 +39,31 @@ export default function DailyStatusForm() {
   // === Fecha ===
   const today = new Date();
   const defaultMM = String(today.getMonth() + 1).padStart(2, "0");
-  const defaultDD = String(today.getDate()).padStart(2, "0");
+  const defaultDD = String(today.getDate()).padStart(2, "0");  
   const [monthSel, setMonthSel] = useState<string>(defaultMM);
   const [daySel, setDaySel] = useState<string>(defaultDD);
   const maxDay = daysInMonth(YEAR_FIXED, monthSel);
 
+  // === Email record with localStorage ===
   useEffect(() => {
-    if (parseInt(daySel || "0", 10) > maxDay) setDaySel("");
+    try {
+      const savedEmail = localStorage.getItem("userEmail");
+      if (savedEmail) setEmail(savedEmail);
+    } catch {}
+  }, []);
+
+  useEffect(() => {
+    try {
+      if (email) localStorage.setItem("userEmail", email);
+    } catch {}
+  }, [email]);
+
+  useEffect(() => {
+    if (parseInt(daySel || "0", 10) > maxDay) {
+      setDaySel(String(maxDay).padStart(2, "0"));
+    }
   }, [monthSel, maxDay]);
+
 
   const projects = [
     "SyncME (Android)",
@@ -113,9 +130,6 @@ export default function DailyStatusForm() {
         setActivity("");
         setLocation("");
         setSelectedProjects([]);
-        setMonthSel(defaultMM);
-        setDaySel(defaultDD);
-        setEmail("");
         setStatus("success");
         setTimeout(() => setStatus("idle"), 1200);
       } else {
@@ -190,10 +204,10 @@ export default function DailyStatusForm() {
             >
               <option value="">Select...</option>
               {Array.from({ length: maxDay }, (_, i) => {
-                const d = String(i + 1);
+                const d = String(i + 1).padStart(2, "0");
                 return (
                   <option key={d} value={d}>
-                    {d}
+                    {parseInt(d, 10)}
                   </option>
                 );
               })}
